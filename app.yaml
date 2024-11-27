@@ -1,0 +1,10 @@
+runtime: python310  # Indique que l'application utilise Python 3.10
+
+entrypoint: gunicorn -w 4 -k uvicorn.workers.UvicornWorker app:app
+# Gunicorn démarre l'application Flask en production avec :
+# - 4 workers (-w 4) pour gérer plusieurs requêtes en parallèle
+# - uvicorn comme gestionnaire de workers async
+
+handlers:
+- url: /.*
+  script: auto

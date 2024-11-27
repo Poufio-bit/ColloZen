@@ -1,0 +1,59 @@
+from flask import Flask, render_template, request, jsonify
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import os
+import torch
+
+app = Flask(__name__)
+
+# Charger le modèle Llama 2
+model_path = os.path.join(os.getcwd(), "llama_model")
+print("Chargement du modèle...")
+
+# Vérifier si GPU est disponible
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Initialisation des variables globales
+tokenizer = None
+model = None
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        device_map="auto" if torch.cuda.is_available() else None,
+        torch_dtype="auto"
+    ).to(device)
+    print("Modèle chargé avec succès!")
+except Exception as e:
+    print(f"Erreur lors du chargement du modèle ou du tokenizer : {e}")
+
+# Page d'accueil
+@app.route("/")
+def home():
+    return "<h1>Bienvenue sur le site ColloZen</h1>"
+
+# Page pour poser des questions
+@app.route("/ask", methods=["GET", "POST"])
+def ask():
+    global tokenizer, model  # Assurez-vous que ces variables sont accessibles
+
+    if not tokenizer or not model:
+        return jsonify({"error": "Le modèle ou le tokenizer n'ont pas été correctement chargés."}), 500
+
+    if request.method == "POST":
+        question = request.form.get("question")
+        if not question:
+            return jsonify({"error": "Aucune question reçue."}), 400
+        
+        try:
+            # Traitement avec Llama 2
+            inputs = tokenizer(question, return_tensors="pt").to(device)
+            outputs = model.generate(inputs["input_ids"], max_new_tokens=150)
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            return jsonify({"question": question, "response": response})
+        except Exception as e:
+            return jsonify({"error": f"Erreur lors du traitement : {str(e)}"}), 500
+    return render_template("ask.html")
+
+if __name__ == "__main__":
+    app.run(debug=True)
